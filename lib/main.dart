@@ -1,8 +1,4 @@
-// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
-
-// import 'dart:math';
-
-// import 'dart:js_util';
+// ignore_for_file: prefer_const_constructors
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -60,20 +56,26 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late TextEditingController _controller;
-
-  final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
-  late Future<List> _notes;
   var previous = "";
-  var notesList = <String>[];
+  late List notesList;
+  // ignore: unused_field, prefer_typing_uninitialized_variables
+  var _notes;
+
+  Future<void> getNotes() async {
+    debugPrint("STARTED THE GET NOTES FUNCTION");
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    var nList = prefs.getStringList("notes");
+    setState(() {
+      notesList = nList ?? [];
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _notes = _prefs.then((SharedPreferences prefs) {
-      notesList = prefs.getStringList("notes") ?? [];
-      return prefs.getStringList("notes") ?? [];
-    });
     _controller = TextEditingController();
+    notesList = <String>[];
+    getNotes();
   }
 
   @override
@@ -98,18 +100,12 @@ class _MyHomePageState extends State<MyHomePage> {
     debugPrint(nList.toString());
   }
 
-  Future<void> _removeNotes(givenValue) async {
+  Future<void> _removeAllNotes() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.remove(givenValue);
-    var nList = prefs.getStringList("notes");
-    nList!.remove(givenValue);
+    await prefs.remove("notes");
     setState(() {
-      _notes = prefs.setStringList("notes", nList).then((bool success) {
-        return nList;
-      });
-      notesList = nList;
+      notesList = [];
     });
-    debugPrint(nList.toString());
   }
 
   Future<void> _saveEditedNote(prev, givenValue) async {
@@ -185,6 +181,18 @@ class _MyHomePageState extends State<MyHomePage> {
               },
               child: Text("New Note"),
             ),
+            SizedBox(width: 20),
+            ElevatedButton(
+              onPressed: () {
+                debugPrint("All Notes Deleted");
+                _removeAllNotes();
+                _controller.clear();
+                setState(() {
+                  previous = "";
+                });
+              },
+              child: Text("Delete All Notes"),
+            ),
           ],
         ),
         Expanded(
@@ -192,22 +200,79 @@ class _MyHomePageState extends State<MyHomePage> {
             shrinkWrap: true,
             itemCount: notesList.length,
             itemBuilder: (context, index) {
-              return ListTile(
-                title: Text(notesList[index]),
-                onTap: () => {
-                  _controller.text = notesList[index],
-                  _setPrevious(notesList[index])
-                },
-                trailing: IconButton(
-                  icon: const Icon(Icons.remove_circle),
-                  onPressed: () => _removeNotes(notesList[index]),
-                ),
-              );
+              return Dismissible(
+                  background: Container(
+                    color: Colors.amberAccent,
+                  ),
+                  key: UniqueKey(),
+                  onDismissed: (DismissDirection direction) => {
+                        setState(() {
+                          notesList.removeAt(index);
+                          previous = "";
+                        })
+                      },
+                  confirmDismiss: (direction) async {
+                    return await showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text("Confirm"),
+                          content: const Text(
+                              "Are you sure you wish to delete this item?"),
+                          actions: <Widget>[
+                            TextButton(
+                                onPressed: () =>
+                                    Navigator.of(context).pop(true),
+                                child: const Text("DELETE")),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text("CANCEL"),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: ListTile(
+                    title: Text(notesList[index]),
+                    onTap: () => {
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (context) => NotePage())
+
+                          // _controller.text = notesList[index],
+                          // _setPrevious(notesList[index])
+                          )
+                    },
+                  ));
             },
           ),
         )
       ]),
       // This trailing comma makes auto-formatting nicer for build methods.
+    );
+  }
+}
+
+class NotePage extends StatelessWidget {
+  const NotePage({super.key, note});
+
+  // This widget is the home page of your application. It is stateful, meaning
+  // that it has a State object (defined below) that contains fields that affect
+  // how it looks.
+
+  // This class is the configuration for the state. It holds the values (in this
+  // case the title) provided by the parent (in this case the App widget) and
+  // used by the build method of the State. Fields in a Widget subclass are
+  // always marked "final".
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Note Page'),
+      ),
+      body: Center(
+        child: Text('Hi There'),
+      ),
     );
   }
 }
