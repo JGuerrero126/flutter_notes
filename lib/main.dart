@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_const_constructors
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -9,6 +11,24 @@ var uuid = Uuid();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
+}
+
+class Note {
+  final String id;
+  final String title;
+  final String note;
+  const Note(this.id, this.title, this.note);
+
+  Note.fromJson(Map<String, dynamic> json)
+      : id = json['id'],
+        title = json['title'],
+        note = json['note'];
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'note': note,
+      };
 }
 
 class MyApp extends StatelessWidget {
@@ -65,8 +85,16 @@ class _MyHomePageState extends State<MyHomePage> {
     debugPrint("STARTED THE GET NOTES FUNCTION");
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     var nList = prefs.getStringList("notes");
+    var fullList = [];
+    for (var note in nList!) {
+      // var singleNote = json.decode(prefs.getString(note));
+      var string = prefs.getString(note);
+      var fixedJson = jsonDecode(string!);
+      fullList.add(fixedJson);
+      // fullList.add(JsonDecoder(prefs.getString(note)));
+    }
     setState(() {
-      notesList = nList ?? [];
+      notesList = fullList;
     });
   }
 
@@ -87,16 +115,18 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _saveNote(givenValue) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     var id = uuid.v4();
-    await prefs.setString(id, givenValue);
+    var note = Note(id, "Test", givenValue);
+    await prefs.setString(id, jsonEncode(note));
     var nList = prefs.getStringList("notes") ?? [];
-    nList.add(givenValue);
+    nList.add(id);
 
     setState(() {
       _notes = prefs.setStringList("notes", nList).then((bool success) {
         return nList;
       });
-      notesList = nList;
+      // notesList = nList;
     });
+    getNotes();
     debugPrint(nList.toString());
   }
 
@@ -124,12 +154,12 @@ class _MyHomePageState extends State<MyHomePage> {
     debugPrint(nList.toString());
   }
 
-  Future<void> _setPrevious(givenValue) async {
-    setState(() {
-      previous = givenValue.toString();
-    });
-    debugPrint(previous);
-  }
+  // Future<void> _setPrevious(givenValue) async {
+  //   setState(() {
+  //     previous = givenValue.toString();
+  //   });
+  //   debugPrint(previous);
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -234,10 +264,13 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                   },
                   child: ListTile(
-                    title: Text(notesList[index]),
+                    title: Text(notesList[index].title),
                     onTap: () => {
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (context) => NotePage())
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  NotePage(note: notesList[index]))
 
                           // _controller.text = notesList[index],
                           // _setPrevious(notesList[index])
@@ -254,7 +287,8 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class NotePage extends StatelessWidget {
-  const NotePage({super.key, note});
+  const NotePage({super.key, required this.note});
+  final Note note;
 
   // This widget is the home page of your application. It is stateful, meaning
   // that it has a State object (defined below) that contains fields that affect
